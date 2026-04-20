@@ -29,17 +29,21 @@ export default function Header({
             <IconMenu />
           </button>
 
-          <div className="w-7 h-7 rounded-lg bg-brand-900 flex items-center justify-center shrink-0">
-            <div className="w-3 h-3 rounded-sm bg-white grid grid-cols-2 grid-rows-2 gap-[1px] overflow-hidden">
-              <div className="bg-brand-900"></div>
-              <div className="bg-brand-900"></div>
-              <div className="bg-brand-900"></div>
-              <div className="bg-brand-900"></div>
-            </div>
-          </div>
+          <a
+            href="/"
+            className="shrink-0 inline-flex items-center"
+            aria-label="The Wingate Centre — home"
+          >
+            <img
+              src="/logo.png"
+              alt="The Wingate Centre"
+              className="h-9 w-auto block"
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
+            />
+          </a>
           <div className="min-w-0">
             <h1 className="text-[14px] sm:text-[15px] font-semibold text-[var(--text)] leading-none truncate">
-              Wingate Content Planner
+              Content Planner
             </h1>
             <p className="text-[11px] text-[var(--text-3)] mt-1 leading-none">
               {visibleCount} of {totalCount} shown
