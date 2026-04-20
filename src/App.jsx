@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks } from 'date-fns'
+import { addDays, addMonths, addWeeks, subDays, subMonths, subWeeks, startOfWeek } from 'date-fns'
 
 import Header from './components/Header.jsx'
-import Filters from './components/Filters.jsx'
+import Sidebar from './components/Sidebar.jsx'
+import Dashboard from './components/Dashboard.jsx'
+import SearchBar from './components/SearchBar.jsx'
+import PresetChips from './components/PresetChips.jsx'
 import Stats from './components/Stats.jsx'
 import CalendarView from './components/CalendarView.jsx'
 import WeekView from './components/WeekView.jsx'
@@ -14,11 +17,13 @@ import CampaignDrawer from './components/CampaignDrawer.jsx'
 import Toast from './components/Toast.jsx'
 
 import { useContentItems } from './hooks/useContentItems.js'
-import { CHANNELS, STATUSES } from './utils/channels.js'
 import { downloadCsv } from './utils/csv.js'
 import { hasSupabase } from './supabase.js'
+import { emptyFilters, applyFilters, activeFilterCount } from './utils/filters.js'
+import { PRESETS, detectActivePreset } from './utils/presets.js'
 
 const VIEW_PERSIST_KEY = 'wingate_view'
+const DASH_PERSIST_KEY = 'wingate_dashboard'
 
 function defaultAnchor() {
   const today = new Date()
@@ -32,24 +37,35 @@ function loadStoredView() {
   return ['month', 'week', 'day', 'list'].includes(v) ? v : 'month'
 }
 
+function loadDashCollapsed() {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(DASH_PERSIST_KEY) === '1'
+}
+
 export default function App() {
   const { items, loading, error, addItem, updateItem, deleteItem } = useContentItems()
 
   const [view, setViewState] = useState(loadStoredView)
   const [anchorDate, setAnchorDate] = useState(defaultAnchor)
-  const [filters, setFilters] = useState(() => ({
-    channels: new Set(CHANNELS.map((c) => c.key)),
-    statuses: new Set(STATUSES),
-    campaign: null,
-    search: '',
-  }))
+  const [filters, setFilters] = useState(emptyFilters)
   const [modal, setModal] = useState(null)
   const [campaignOpen, setCampaignOpen] = useState(null)
   const [toast, setToast] = useState(null)
 
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [dashboardCollapsed, setDashCollapsed] = useState(loadDashCollapsed)
+
   const setView = (v) => {
     setViewState(v)
     try { window.localStorage.setItem(VIEW_PERSIST_KEY, v) } catch {}
+  }
+
+  const toggleDash = () => {
+    setDashCollapsed((c) => {
+      const next = !c
+      try { window.localStorage.setItem(DASH_PERSIST_KEY, next ? '1' : '0') } catch {}
+      return next
+    })
   }
 
   const allCampaigns = useMemo(() => {
@@ -64,19 +80,8 @@ export default function App() {
     return Array.from(set).sort((a, b) => a.localeCompare(b))
   }, [items])
 
-  const filtered = useMemo(() => {
-    const q = filters.search.trim().toLowerCase()
-    return items.filter((it) => {
-      if (!filters.channels.has(it.channel)) return false
-      if (!filters.statuses.has(it.status)) return false
-      if (filters.campaign && it.campaign !== filters.campaign) return false
-      if (q) {
-        const hay = `${it.topic} ${it.campaign} ${it.notes} ${it.content_type} ${it.owner}`.toLowerCase()
-        if (!hay.includes(q)) return false
-      }
-      return true
-    })
-  }, [items, filters])
+  const filtered = useMemo(() => applyFilters(items, filters), [items, filters])
+  const activePreset = useMemo(() => detectActivePreset(filters), [filters])
 
   const dated = filtered.filter((i) => i.date)
   const tbc = filtered.filter((i) => !i.date)
@@ -119,27 +124,47 @@ export default function App() {
     setToast({ type: 'success', message: `Exported ${filtered.length} items` })
   }
 
+  const handlePreset = (presetId) => {
+    const p = PRESETS.find((x) => x.id === presetId)
+    if (!p) return
+    // Toggle back to "all" when clicking an already-active preset
+    if (activePreset === presetId && presetId !== 'all') {
+      setFilters(emptyFilters())
+    } else {
+      setFilters(p.build({ currentOwner: 'Matt' }))
+    }
+  }
+
+  const handleHeatmapCell = ({ channel, date }) => {
+    // Filter to just this channel
+    setFilters({ ...emptyFilters(), channels: new Set([channel]) })
+    // If a specific date was clicked, jump to it in whichever calendar view is active
+    if (date) {
+      try {
+        const d = new Date(date + 'T00:00')
+        setAnchorDate(d)
+        if (view === 'month' || view === 'list') setView('day')
+      } catch {}
+    }
+  }
+
+  const clearAll = () => setFilters(emptyFilters())
+
   // ----- Global keyboard shortcuts -----
   useEffect(() => {
     const onKey = (e) => {
-      if (modal || campaignOpen) return // don't steal keys from overlays
+      if (modal || campaignOpen) return
       const inInput =
         e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)
       if (inInput) return
 
-      // View switching: m, w, d, l
       if (e.key === 'm') { setView('month'); return }
       if (e.key === 'w') { setView('week');  return }
       if (e.key === 'd') { setView('day');   return }
       if (e.key === 'l') { setView('list');  return }
-
-      // New item: n
       if (e.key === 'n') { openCreate(null); return }
-
-      // Today: t
       if (e.key === 't') { setAnchorDate(new Date()); return }
 
-      // Arrow navigation in calendar views
       if (view === 'list') return
       if (e.key === 'ArrowLeft') {
         setAnchorDate((d) => view === 'month' ? subMonths(d, 1) : view === 'week' ? subWeeks(d, 1) : subDays(d, 1))
@@ -163,68 +188,93 @@ export default function App() {
         onViewChange={setView}
         onAdd={() => openCreate(null)}
         onExport={handleExport}
+        onMenuClick={() => setSidebarOpen(true)}
       />
 
-      <main className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4">
-        {loading && <LoadingState />}
+      <div className="flex">
+        <Sidebar
+          mobileOpen={sidebarOpen}
+          onMobileClose={() => setSidebarOpen(false)}
+          view={view}
+          onViewChange={setView}
+          onAnchorChange={setAnchorDate}
+          allItems={items}
+          filters={filters}
+          onFiltersChange={setFilters}
+          onOpenCampaign={(c) => setCampaignOpen(c)}
+          onItemClick={openEdit}
+        />
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-4 text-sm">
-            <strong className="font-semibold">Error:</strong> {error.message}
+        <main className="flex-1 min-w-0 max-w-full">
+          <div className="max-w-[1200px] mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4">
+            {loading && <LoadingState />}
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-4 text-sm">
+                <strong className="font-semibold">Error:</strong> {error.message}
+              </div>
+            )}
+
+            {!loading && !error && (
+              <>
+                <SearchBar filters={filters} onChange={setFilters} onClear={clearAll} />
+
+                <Dashboard
+                  collapsed={dashboardCollapsed}
+                  onToggleCollapsed={toggleDash}
+                  allItems={items}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  onItemClick={openEdit}
+                  onQuickFilter={handlePreset}
+                  onHeatmapCellClick={handleHeatmapCell}
+                />
+
+                <PresetChips activePreset={activePreset} onApply={handlePreset} />
+
+                <Stats items={filtered} totalCount={items.length} filters={filters} />
+
+                {view !== 'list' && (
+                  <TbcPanel items={tbc} onItemClick={openEdit} onAdd={openCreate} />
+                )}
+
+                {view === 'month' && (
+                  <CalendarView
+                    monthDate={anchorDate}
+                    onMonthChange={setAnchorDate}
+                    items={dated}
+                    onItemClick={openEdit}
+                    onAddItem={openCreate}
+                  />
+                )}
+                {view === 'week' && (
+                  <WeekView
+                    anchorDate={anchorDate}
+                    onAnchorChange={setAnchorDate}
+                    items={dated}
+                    onItemClick={openEdit}
+                    onAddItem={openCreate}
+                  />
+                )}
+                {view === 'day' && (
+                  <DayView
+                    anchorDate={anchorDate}
+                    onAnchorChange={setAnchorDate}
+                    items={dated}
+                    onItemClick={openEdit}
+                    onAddItem={openCreate}
+                  />
+                )}
+                {view === 'list' && (
+                  <ListView items={filtered} onItemClick={openEdit} />
+                )}
+
+                <KeyboardHint />
+              </>
+            )}
           </div>
-        )}
-
-        {!loading && !error && (
-          <>
-            <Filters
-              allItems={items}
-              allCampaigns={allCampaigns}
-              filters={filters}
-              onChange={setFilters}
-              onOpenCampaign={(c) => setCampaignOpen(c)}
-            />
-
-            <Stats items={filtered} />
-
-            {view !== 'list' && (
-              <TbcPanel items={tbc} onItemClick={openEdit} onAdd={openCreate} />
-            )}
-
-            {view === 'month' && (
-              <CalendarView
-                monthDate={anchorDate}
-                onMonthChange={setAnchorDate}
-                items={dated}
-                onItemClick={openEdit}
-                onAddItem={openCreate}
-              />
-            )}
-            {view === 'week' && (
-              <WeekView
-                anchorDate={anchorDate}
-                onAnchorChange={setAnchorDate}
-                items={dated}
-                onItemClick={openEdit}
-                onAddItem={openCreate}
-              />
-            )}
-            {view === 'day' && (
-              <DayView
-                anchorDate={anchorDate}
-                onAnchorChange={setAnchorDate}
-                items={dated}
-                onItemClick={openEdit}
-                onAddItem={openCreate}
-              />
-            )}
-            {view === 'list' && (
-              <ListView items={filtered} onItemClick={openEdit} />
-            )}
-
-            <KeyboardHint />
-          </>
-        )}
-      </main>
+        </main>
+      </div>
 
       {modal && (
         <ItemModal
@@ -282,8 +332,12 @@ function Kbd({ k, label }) {
 function LoadingState() {
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow-card h-24 animate-pulse" />
-      <div className="bg-white rounded-xl shadow-card h-10 animate-pulse" />
+      <div className="bg-white rounded-xl shadow-card h-14 animate-pulse" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-white rounded-xl shadow-card h-32 animate-pulse" />
+        <div className="bg-white rounded-xl shadow-card h-32 animate-pulse" />
+        <div className="bg-white rounded-xl shadow-card h-32 animate-pulse" />
+      </div>
       <div className="bg-white rounded-xl shadow-card h-96 animate-pulse" />
     </div>
   )

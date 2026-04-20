@@ -1,4 +1,4 @@
-import { IconCalendar, IconWeek, IconDay, IconList, IconDownload, IconPlus } from './Icons.jsx'
+import { IconCalendar, IconWeek, IconDay, IconList, IconDownload, IconPlus, IconMenu } from './Icons.jsx'
 
 const VIEWS = [
   { key: 'month', label: 'Month', Icon: IconCalendar },
@@ -14,11 +14,21 @@ export default function Header({
   onViewChange,
   onAdd,
   onExport,
+  onMenuClick,
 }) {
   return (
     <header className="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-[var(--border)]">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="px-3 sm:px-4 h-14 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Mobile hamburger */}
+          <button
+            onClick={onMenuClick}
+            className="lg:hidden w-9 h-9 rounded-lg text-[var(--text-2)] hover:bg-[var(--bg)] hover:text-[var(--text)] inline-flex items-center justify-center"
+            aria-label="Open menu"
+          >
+            <IconMenu />
+          </button>
+
           <div className="w-7 h-7 rounded-lg bg-brand-900 flex items-center justify-center shrink-0">
             <div className="w-3 h-3 rounded-sm bg-white grid grid-cols-2 grid-rows-2 gap-[1px] overflow-hidden">
               <div className="bg-brand-900"></div>
@@ -28,7 +38,7 @@ export default function Header({
             </div>
           </div>
           <div className="min-w-0">
-            <h1 className="text-[15px] font-semibold text-[var(--text)] leading-none truncate">
+            <h1 className="text-[14px] sm:text-[15px] font-semibold text-[var(--text)] leading-none truncate">
               Wingate Content Planner
             </h1>
             <p className="text-[11px] text-[var(--text-3)] mt-1 leading-none">
@@ -54,28 +64,6 @@ export default function Header({
                 >
                   <Icon width={14} height={14} />
                   {label}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Mobile segmented control — icons only */}
-          <div className="md:hidden inline-flex rounded-lg border border-[var(--border)] p-0.5 bg-[var(--bg)]">
-            {VIEWS.map(({ key, label, Icon }) => {
-              const active = view === key
-              return (
-                <button
-                  key={key}
-                  className={`p-1.5 rounded-md transition ${
-                    active
-                      ? 'bg-white text-[var(--accent)] shadow-sm'
-                      : 'text-[var(--text-2)]'
-                  }`}
-                  onClick={() => onViewChange(key)}
-                  aria-label={`${label} view`}
-                  title={label}
-                >
-                  <Icon width={15} height={15} />
                 </button>
               )
             })}

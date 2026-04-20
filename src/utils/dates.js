@@ -6,6 +6,8 @@ import {
   eachDayOfInterval,
   isSameMonth,
   isSameDay,
+  isWithinInterval,
+  differenceInHours,
   format,
   getISOWeek,
   getYear,
@@ -104,3 +106,41 @@ export function dayShortLabel(d) {
 }
 
 export { addWeeks, subWeeks, addDays, subDays }
+
+// ----- Range / relative helpers (for dashboard tiles + presets) -----
+
+export function currentWeekRange(ref = new Date()) {
+  return {
+    from: isoDate(startOfWeek(ref, WEEK_OPTS)),
+    to: isoDate(endOfWeek(ref, WEEK_OPTS)),
+  }
+}
+
+export function lastWeekRange(ref = new Date()) {
+  const ref2 = subWeeks(ref, 1)
+  return currentWeekRange(ref2)
+}
+
+export function nextNHoursRange(hours, ref = new Date()) {
+  return {
+    from: isoDate(ref),
+    to: isoDate(addDays(ref, Math.ceil(hours / 24))),
+  }
+}
+
+export function inDateRange(iso, range) {
+  if (!iso || !range) return false
+  const d = fromIso(iso)
+  if (!d) return false
+  const start = fromIso(range.from)
+  const end = fromIso(range.to)
+  if (!start || !end) return false
+  return isWithinInterval(d, { start, end })
+}
+
+export function within48h(iso, ref = new Date()) {
+  const d = fromIso(iso)
+  if (!d) return false
+  const diff = differenceInHours(d, ref)
+  return diff >= 0 && diff <= 48
+}
