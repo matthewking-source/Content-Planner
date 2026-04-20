@@ -17,6 +17,7 @@ import CampaignDrawer from './components/CampaignDrawer.jsx'
 import Toast from './components/Toast.jsx'
 
 import { useContentItems } from './hooks/useContentItems.js'
+import { useDragReschedule } from './hooks/useDragReschedule.js'
 import { downloadCsv } from './utils/csv.js'
 import { hasSupabase } from './supabase.js'
 import { emptyFilters, applyFilters, activeFilterCount } from './utils/filters.js'
@@ -123,6 +124,25 @@ export default function App() {
     downloadCsv(filtered, `wingate-content-plan-${stamp}.csv`)
     setToast({ type: 'success', message: `Exported ${filtered.length} items` })
   }
+
+  const handleReschedule = async (item, newDateIsoOrNull) => {
+    if (!item?.id) return
+    const prev = item.date || 'TBC'
+    const next = newDateIsoOrNull || null
+    try {
+      await updateItem(item.id, { date: next })
+      const label = next
+        ? new Date(next + 'T00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+        : 'TBC'
+      setToast({ type: 'success', message: `Moved to ${label}` })
+    } catch (e) {
+      console.error('Reschedule failed', e)
+      setToast({ type: 'error', message: `Could not move (was ${prev})` })
+    }
+  }
+
+  // One shared drag instance so dragging from TBC into the calendar (and back) works
+  const drag = useDragReschedule(handleReschedule)
 
   const handlePreset = (presetId) => {
     const p = PRESETS.find((x) => x.id === presetId)
@@ -235,7 +255,12 @@ export default function App() {
                 <Stats items={filtered} totalCount={items.length} filters={filters} />
 
                 {view !== 'list' && (
-                  <TbcPanel items={tbc} onItemClick={openEdit} onAdd={openCreate} />
+                  <TbcPanel
+                    items={tbc}
+                    onItemClick={openEdit}
+                    onAdd={openCreate}
+                    drag={drag}
+                  />
                 )}
 
                 {view === 'month' && (
@@ -245,6 +270,7 @@ export default function App() {
                     items={dated}
                     onItemClick={openEdit}
                     onAddItem={openCreate}
+                    drag={drag}
                   />
                 )}
                 {view === 'week' && (
@@ -254,6 +280,7 @@ export default function App() {
                     items={dated}
                     onItemClick={openEdit}
                     onAddItem={openCreate}
+                    drag={drag}
                   />
                 )}
                 {view === 'day' && (

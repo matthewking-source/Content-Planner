@@ -9,6 +9,7 @@ export default function WeekView({
   items,
   onItemClick,
   onAddItem,
+  drag,
 }) {
   const days = weekDays(anchorDate)
 
@@ -45,7 +46,6 @@ export default function WeekView({
         <div className="w-[140px]" />
       </div>
 
-      {/* Day columns */}
       <div className="grid grid-cols-7 min-h-[60vh]">
         {days.map((day) => {
           const dateStr = isoDate(day)
@@ -53,13 +53,16 @@ export default function WeekView({
           const today = isToday(day)
           const dow = getDay(day)
           const weekend = dow === 0 || dow === 6
+          const dropHandlers = drag.targetHandlers(dateStr, dateStr)
+          const isDropTarget = drag.isTarget(dateStr)
 
           return (
             <div
               key={day.toISOString()}
-              className={`group relative border-r border-[var(--border-2)] last:border-r-0 flex flex-col min-h-full ${
+              {...dropHandlers}
+              className={`group relative border-r border-[var(--border-2)] last:border-r-0 flex flex-col min-h-full transition ${
                 weekend ? 'bg-[var(--bg)]' : 'bg-white'
-              }`}
+              } ${isDropTarget ? 'ring-2 ring-[var(--accent)] ring-inset bg-[var(--accent-tint)]' : ''}`}
             >
               <div className="px-2.5 py-2.5 border-b border-[var(--border-2)] sticky top-14 bg-inherit z-[5]">
                 <div className="flex items-baseline justify-between">
@@ -112,7 +115,14 @@ export default function WeekView({
                   </button>
                 )}
                 {dayItems.map((it) => (
-                  <CalendarItem key={it.id} item={it} onClick={() => onItemClick(it)} />
+                  <CalendarItem
+                    key={it.id}
+                    item={it}
+                    onClick={() => onItemClick(it)}
+                    onDragStart={drag.onDragStart}
+                    onDragEnd={drag.onDragEnd}
+                    dragging={drag.isDragging(it.id)}
+                  />
                 ))}
               </div>
             </div>

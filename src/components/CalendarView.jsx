@@ -9,6 +9,7 @@ export default function CalendarView({
   items,
   onItemClick,
   onAddItem,
+  drag,
 }) {
   const grid = monthGrid(monthDate)
   const headers = weekdayHeaders()
@@ -68,6 +69,7 @@ export default function CalendarView({
             items={items}
             onItemClick={onItemClick}
             onAddItem={onAddItem}
+            drag={drag}
           />
         ))}
       </div>

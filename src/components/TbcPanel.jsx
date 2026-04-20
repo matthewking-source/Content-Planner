@@ -2,12 +2,39 @@ import { useState } from 'react'
 import { channelStyle, STATUS_STYLES } from '../utils/channels.js'
 import { IconChevDn, IconChevUp, IconPlus, IconSparkle } from './Icons.jsx'
 
-export default function TbcPanel({ items, onItemClick, onAdd }) {
+export default function TbcPanel({ items, onItemClick, onAdd, drag }) {
   const [collapsed, setCollapsed] = useState(false)
-  if (items.length === 0) return null
+  const drop = drag?.targetHandlers('__TBC__', null) || {}
+  const isDropTarget = drag?.isTarget('__TBC__')
+  const canDrag = Boolean(drag)
+
+  if (items.length === 0 && !drag?.draggingItem) return null
+
+  // Show empty state as drop zone when something is being dragged
+  if (items.length === 0) {
+    return (
+      <div
+        {...drop}
+        className={`rounded-xl p-3 sm:p-4 border-2 border-dashed transition ${
+          isDropTarget
+            ? 'border-[var(--accent)] bg-[var(--accent-tint)]'
+            : 'border-[var(--border)] bg-white'
+        }`}
+      >
+        <div className="text-center text-[12px] text-[var(--text-3)]">
+          Drop here to move to <strong>Date TBC</strong>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="bg-white rounded-xl shadow-card overflow-hidden animate-fade">
+    <div
+      {...drop}
+      className={`bg-white rounded-xl shadow-card overflow-hidden animate-fade transition ${
+        isDropTarget ? 'ring-2 ring-[var(--accent)]' : ''
+      }`}
+    >
       <button
         onClick={() => setCollapsed((c) => !c)}
         className="w-full flex items-center justify-between px-4 py-2.5 border-b border-[var(--border-2)] hover:bg-[var(--bg)] transition"
@@ -22,6 +49,9 @@ export default function TbcPanel({ items, onItemClick, onAdd }) {
           <span className="text-[11.5px] text-[var(--text-3)]">
             {items.length} item{items.length === 1 ? '' : 's'} to schedule
           </span>
+          {isDropTarget && (
+            <span className="text-[11px] text-[var(--accent)] font-medium ml-1">Drop to unschedule</span>
+          )}
         </div>
         <span className="text-[var(--text-3)]">
           {collapsed ? <IconChevDn width={14} height={14} /> : <IconChevUp width={14} height={14} />}
@@ -34,14 +64,25 @@ export default function TbcPanel({ items, onItemClick, onAdd }) {
             {items.map((it) => {
               const style = channelStyle(it.channel)
               const ss = STATUS_STYLES[it.status] || STATUS_STYLES.Planned
+              const isDragging = drag?.isDragging(it.id)
               return (
                 <button
                   key={it.id}
                   onClick={() => onItemClick(it)}
-                  className="text-left max-w-xs rounded-lg px-3 py-2 text-[12px] border hover:shadow-pop transition"
+                  draggable={canDrag}
+                  onDragStart={(e) => {
+                    if (!canDrag) return
+                    e.dataTransfer.effectAllowed = 'move'
+                    e.dataTransfer.setData('text/plain', it.id)
+                    drag.onDragStart(it)
+                  }}
+                  onDragEnd={drag?.onDragEnd}
+                  className="text-left max-w-xs rounded-lg px-3 py-2 text-[12px] border hover:shadow-pop transition relative"
                   style={{
                     backgroundColor: style.bg,
                     borderColor: 'rgba(14, 18, 48, 0.06)',
+                    opacity: isDragging ? 0.35 : 1,
+                    cursor: canDrag ? 'grab' : 'pointer',
                   }}
                 >
                   <div className="flex items-center gap-1.5 mb-1">
