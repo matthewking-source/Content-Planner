@@ -14,9 +14,12 @@ import ListView from './components/ListView.jsx'
 import TbcPanel from './components/TbcPanel.jsx'
 import ItemModal from './components/ItemModal.jsx'
 import CampaignDrawer from './components/CampaignDrawer.jsx'
+import RequestModal from './components/RequestModal.jsx'
+import RequestsPanel from './components/RequestsPanel.jsx'
 import Toast from './components/Toast.jsx'
 
 import { useContentItems } from './hooks/useContentItems.js'
+import { useRequests } from './hooks/useRequests.js'
 import { useDragReschedule } from './hooks/useDragReschedule.js'
 import { downloadCsv } from './utils/csv.js'
 import { hasSupabase } from './supabase.js'
@@ -45,6 +48,15 @@ function loadDashCollapsed() {
 
 export default function App() {
   const { items, loading, error, addItem, updateItem, deleteItem } = useContentItems()
+  const {
+    requests,
+    tableMissing: requestsTableMissing,
+    submitRequest,
+    approveRequest,
+    ignoreRequest,
+    reopenRequest,
+    deleteRequest,
+  } = useRequests()
 
   const [view, setViewState] = useState(loadStoredView)
   const [anchorDate, setAnchorDate] = useState(defaultAnchor)
@@ -55,6 +67,14 @@ export default function App() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [dashboardCollapsed, setDashCollapsed] = useState(loadDashCollapsed)
+  const [requestModalOpen, setRequestModalOpen] = useState(false)
+  const [requestsPanelOpen, setRequestsPanelOpen] = useState(false)
+  const [pendingApprovalRequestId, setPendingApprovalRequestId] = useState(null)
+
+  const pendingRequestCount = useMemo(
+    () => requests.filter((r) => r.status === 'pending').length,
+    [requests],
+  )
 
   const setView = (v) => {
     setViewState(v)
@@ -95,8 +115,23 @@ export default function App() {
       await updateItem(modal.initial.id, payload)
       setToast({ type: 'success', message: 'Item updated' })
     } else {
-      await addItem(payload)
-      setToast({ type: 'success', message: 'Item added' })
+      const created = await addItem(payload)
+      // If this save was triggered by approving a request, mark the request approved
+      if (pendingApprovalRequestId && created?.id) {
+        try {
+          await approveRequest(pendingApprovalRequestId, {
+            reviewedBy: getReviewerName(),
+            linkedItemId: created.id,
+          })
+          setToast({ type: 'success', message: 'Request approved and added to calendar' })
+        } catch (e) {
+          console.error('Approve request update failed', e)
+          setToast({ type: 'success', message: 'Item added (request status not updated)' })
+        }
+        setPendingApprovalRequestId(null)
+      } else {
+        setToast({ type: 'success', message: 'Item added' })
+      }
     }
   }
 
@@ -143,6 +178,74 @@ export default function App() {
 
   // One shared drag instance so dragging from TBC into the calendar (and back) works
   const drag = useDragReschedule(handleReschedule)
+
+  // ----- Request flows -----
+
+  const getReviewerName = () => {
+    try { return window.localStorage.getItem('wingate_content_author') || 'Matt' } catch { return 'Matt' }
+  }
+
+  const handleSubmitRequest = async (payload) => {
+    try {
+      await submitRequest(payload)
+    } catch (e) {
+      console.error('Submit request failed', e)
+      throw e
+    }
+  }
+
+  const handleApproveRequest = (request) => {
+    // Pre-fill the ItemModal from the request. On save, we'll mark the
+    // request approved and link the new item via pendingApprovalRequestId.
+    setPendingApprovalRequestId(request.id)
+    setRequestsPanelOpen(false)
+    setModal({
+      mode: 'create',
+      initial: {
+        date: request.requested_date || '',
+        channel: request.channel_preferences?.[0] || 'Facebook',
+        content_type: 'Post',
+        topic: request.description,
+        campaign: '',
+        owner: getReviewerName(),
+        status: 'Planned',
+        notes: [
+          request.notes?.trim(),
+          `Requested by ${request.requester_name} (${request.requester_department})`,
+        ].filter(Boolean).join('\n'),
+      },
+    })
+  }
+
+  const handleIgnoreRequest = async (request, reason) => {
+    try {
+      await ignoreRequest(request.id, { reviewedBy: getReviewerName(), reason })
+      setToast({ type: 'info', message: 'Request moved to archive' })
+    } catch (e) {
+      console.error('Ignore failed', e)
+      setToast({ type: 'error', message: 'Could not ignore request' })
+    }
+  }
+
+  const handleReopenRequest = async (request) => {
+    try {
+      await reopenRequest(request.id)
+      setToast({ type: 'info', message: 'Request reopened' })
+    } catch (e) {
+      console.error('Reopen failed', e)
+      setToast({ type: 'error', message: 'Could not reopen request' })
+    }
+  }
+
+  const handleDeleteRequest = async (id) => {
+    try {
+      await deleteRequest(id)
+      setToast({ type: 'success', message: 'Request deleted' })
+    } catch (e) {
+      console.error('Delete request failed', e)
+      setToast({ type: 'error', message: 'Could not delete request' })
+    }
+  }
 
   const handlePreset = (presetId) => {
     const p = PRESETS.find((x) => x.id === presetId)
@@ -223,6 +326,9 @@ export default function App() {
           onFiltersChange={setFilters}
           onOpenCampaign={(c) => setCampaignOpen(c)}
           onItemClick={openEdit}
+          pendingRequestCount={pendingRequestCount}
+          onReviewRequests={() => setRequestsPanelOpen(true)}
+          onSubmitRequest={() => setRequestModalOpen(true)}
         />
 
         <main className="flex-1 min-w-0 max-w-full">
@@ -248,6 +354,9 @@ export default function App() {
                   onItemClick={openEdit}
                   onQuickFilter={handlePreset}
                   onHeatmapCellClick={handleHeatmapCell}
+                  pendingRequestCount={pendingRequestCount}
+                  onReviewRequests={() => setRequestsPanelOpen(true)}
+                  onSubmitRequest={() => setRequestModalOpen(true)}
                 />
 
                 <PresetChips activePreset={activePreset} onApply={handlePreset} />
@@ -312,7 +421,34 @@ export default function App() {
           onSave={handleSave}
           onDelete={modal.mode === 'edit' ? handleDelete : undefined}
           onDuplicate={modal.mode === 'edit' ? handleDuplicate : undefined}
-          onClose={() => setModal(null)}
+          onClose={() => {
+            setModal(null)
+            // If the user cancels an approval, don't leave it "pending approval"
+            setPendingApprovalRequestId(null)
+          }}
+        />
+      )}
+
+      {requestModalOpen && (
+        <RequestModal
+          onSubmit={handleSubmitRequest}
+          onClose={() => setRequestModalOpen(false)}
+        />
+      )}
+
+      {requestsPanelOpen && (
+        <RequestsPanel
+          requests={requests}
+          tableMissing={requestsTableMissing}
+          onClose={() => setRequestsPanelOpen(false)}
+          onApprove={handleApproveRequest}
+          onIgnore={handleIgnoreRequest}
+          onReopen={handleReopenRequest}
+          onDelete={handleDeleteRequest}
+          onSubmitNew={() => {
+            setRequestsPanelOpen(false)
+            setRequestModalOpen(true)
+          }}
         />
       )}
 

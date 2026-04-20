@@ -3,6 +3,7 @@ import ViewNav from './sidebar/ViewNav.jsx'
 import StatusNav from './sidebar/StatusNav.jsx'
 import CampaignNav from './sidebar/CampaignNav.jsx'
 import ActivityFeed from './sidebar/ActivityFeed.jsx'
+import RequestsNav from './sidebar/RequestsNav.jsx'
 import { IconClose } from './Icons.jsx'
 
 export default function Sidebar({
@@ -20,6 +21,10 @@ export default function Sidebar({
   onOpenCampaign,
   // Activity
   onItemClick,
+  // Requests
+  pendingRequestCount,
+  onReviewRequests,
+  onSubmitRequest,
 }) {
   // Escape closes the mobile drawer
   useEffect(() => {
@@ -32,6 +37,12 @@ export default function Sidebar({
   const content = (
     <nav className="h-full flex flex-col overflow-y-auto">
       <div className="flex-1 p-3 space-y-5">
+        <RequestsNav
+          pendingCount={pendingRequestCount}
+          onReview={onReviewRequests}
+          onSubmit={onSubmitRequest}
+          onClose={onMobileClose}
+        />
         <ViewNav
           view={view}
           onViewChange={onViewChange}

@@ -2,6 +2,7 @@ import ThisWeekTile from './dashboard/ThisWeekTile.jsx'
 import NeedsAttentionTile from './dashboard/NeedsAttentionTile.jsx'
 import ChannelHeatmap from './dashboard/ChannelHeatmap.jsx'
 import ChannelRow from './dashboard/ChannelRow.jsx'
+import RequestsTile from './dashboard/RequestsTile.jsx'
 import { IconChevDn, IconChevUp, IconGrid } from './Icons.jsx'
 
 export default function Dashboard({
@@ -13,6 +14,9 @@ export default function Dashboard({
   onItemClick,
   onQuickFilter,
   onHeatmapCellClick,
+  pendingRequestCount,
+  onReviewRequests,
+  onSubmitRequest,
 }) {
   return (
     <section className="space-y-3 animate-fade">
@@ -41,6 +45,12 @@ export default function Dashboard({
 
       {!collapsed && (
         <>
+          <RequestsTile
+            pendingCount={pendingRequestCount}
+            onReview={onReviewRequests}
+            onSubmit={onSubmitRequest}
+          />
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <ThisWeekTile
               allItems={allItems}
