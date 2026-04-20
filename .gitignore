@@ -1,0 +1,15 @@
+node_modules
+dist
+.env
+.env.local
+.env.*.local
+.netlify
+.DS_Store
+.vscode
+*.log
+
+# Helper script not needed in repo / deploy
+Install-GitForClaude.ps1
+
+# Claude Code per-session settings — not shared
+.claude/
