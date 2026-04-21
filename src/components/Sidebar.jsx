@@ -4,6 +4,7 @@ import StatusNav from './sidebar/StatusNav.jsx'
 import CampaignNav from './sidebar/CampaignNav.jsx'
 import ActivityFeed from './sidebar/ActivityFeed.jsx'
 import RequestsNav from './sidebar/RequestsNav.jsx'
+import DatesNav from './sidebar/DatesNav.jsx'
 import { IconClose } from './Icons.jsx'
 
 export default function Sidebar({
@@ -25,6 +26,11 @@ export default function Sidebar({
   pendingRequestCount,
   onReviewRequests,
   onSubmitRequest,
+  // Important dates
+  importantDates,
+  onDateItemClick,
+  onAddDate,
+  onOpenAllDates,
 }) {
   // Escape closes the mobile drawer
   useEffect(() => {
@@ -59,6 +65,13 @@ export default function Sidebar({
           filters={filters}
           onChange={onFiltersChange}
           onOpenCampaign={onOpenCampaign}
+        />
+        <DatesNav
+          dates={importantDates || []}
+          onItemClick={onDateItemClick}
+          onAdd={onAddDate}
+          onOpenAll={onOpenAllDates}
+          onClose={onMobileClose}
         />
       </div>
       <div className="border-t border-[var(--border-2)] p-3">

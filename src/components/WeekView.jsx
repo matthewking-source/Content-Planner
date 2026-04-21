@@ -1,7 +1,8 @@
 import { format, isToday, getDay } from 'date-fns'
 import CalendarItem from './CalendarItem.jsx'
+import DateBanner from './DateBanner.jsx'
 import { IconChevL, IconChevR, IconPlus } from './Icons.jsx'
-import { isoDate, weekDays, weekRangeLabel, addWeeks, subWeeks } from '../utils/dates.js'
+import { isoDate, weekDays, weekRangeLabel, addWeeks, subWeeks, importantDateCoversDay } from '../utils/dates.js'
 
 export default function WeekView({
   anchorDate,
@@ -10,6 +11,8 @@ export default function WeekView({
   onItemClick,
   onAddItem,
   drag,
+  importantDates = [],
+  onDateClick,
 }) {
   const days = weekDays(anchorDate)
 
@@ -106,6 +109,12 @@ export default function WeekView({
               </div>
 
               <div className="flex-1 p-2 space-y-1 overflow-y-auto day-items">
+                {(() => {
+                  const datesForDay = importantDates.filter((d) => importantDateCoversDay(d, day))
+                  return datesForDay.length > 0 ? (
+                    <DateBanner dates={datesForDay} variant="week" onClick={onDateClick} />
+                  ) : null
+                })()}
                 {dayItems.length === 0 && (
                   <button
                     onClick={() => onAddItem(dateStr)}

@@ -1,7 +1,8 @@
 import { format, isToday } from 'date-fns'
+import DateBanner from './DateBanner.jsx'
 import { IconChevL, IconChevR, IconPlus } from './Icons.jsx'
 import { channelStyle, STATUS_STYLES } from '../utils/channels.js'
-import { isoDate, dayLabel, addDays, subDays } from '../utils/dates.js'
+import { isoDate, dayLabel, addDays, subDays, importantDateCoversDay } from '../utils/dates.js'
 
 export default function DayView({
   anchorDate,
@@ -9,9 +10,12 @@ export default function DayView({
   items,
   onItemClick,
   onAddItem,
+  importantDates = [],
+  onDateClick,
 }) {
   const dateStr = isoDate(anchorDate)
   const dayItems = items.filter((i) => i.date === dateStr)
+  const datesForDay = importantDates.filter((d) => importantDateCoversDay(d, anchorDate))
   const today = isToday(anchorDate)
 
   return (
@@ -60,7 +64,11 @@ export default function DayView({
       </div>
 
       <div className="p-4 sm:p-6 space-y-3">
-        {dayItems.length === 0 && (
+        {datesForDay.length > 0 && (
+          <DateBanner dates={datesForDay} variant="day" onClick={onDateClick} />
+        )}
+
+        {dayItems.length === 0 && datesForDay.length === 0 && (
           <div className="text-center py-14 border border-dashed border-[var(--border)] rounded-xl">
             <p className="text-[14px] text-[var(--text-2)] mb-1">
               Nothing planned for {format(anchorDate, 'EEEE d MMMM')}

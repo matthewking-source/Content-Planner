@@ -16,10 +16,13 @@ import ItemModal from './components/ItemModal.jsx'
 import CampaignDrawer from './components/CampaignDrawer.jsx'
 import RequestModal from './components/RequestModal.jsx'
 import RequestsPanel from './components/RequestsPanel.jsx'
+import DateModal from './components/DateModal.jsx'
+import DatesView from './components/DatesView.jsx'
 import Toast from './components/Toast.jsx'
 
 import { useContentItems } from './hooks/useContentItems.js'
 import { useRequests } from './hooks/useRequests.js'
+import { useImportantDates } from './hooks/useImportantDates.js'
 import { useDragReschedule } from './hooks/useDragReschedule.js'
 import { downloadCsv } from './utils/csv.js'
 import { hasSupabase } from './supabase.js'
@@ -38,7 +41,7 @@ function defaultAnchor() {
 function loadStoredView() {
   if (typeof window === 'undefined') return 'month'
   const v = window.localStorage.getItem(VIEW_PERSIST_KEY)
-  return ['month', 'week', 'day', 'list'].includes(v) ? v : 'month'
+  return ['month', 'week', 'day', 'list', 'dates'].includes(v) ? v : 'month'
 }
 
 function loadDashCollapsed() {
@@ -57,6 +60,13 @@ export default function App() {
     reopenRequest,
     deleteRequest,
   } = useRequests()
+  const {
+    dates: importantDates,
+    tableMissing: datesTableMissing,
+    addDate,
+    updateDate,
+    deleteDate,
+  } = useImportantDates()
 
   const [view, setViewState] = useState(loadStoredView)
   const [anchorDate, setAnchorDate] = useState(defaultAnchor)
@@ -70,6 +80,7 @@ export default function App() {
   const [requestModalOpen, setRequestModalOpen] = useState(false)
   const [requestsPanelOpen, setRequestsPanelOpen] = useState(false)
   const [pendingApprovalRequestId, setPendingApprovalRequestId] = useState(null)
+  const [dateModal, setDateModal] = useState(null) // { mode: 'create'|'edit', initial }
 
   const pendingRequestCount = useMemo(
     () => requests.filter((r) => r.status === 'pending').length,
@@ -247,6 +258,27 @@ export default function App() {
     }
   }
 
+  // ----- Important date flows -----
+
+  const openDateCreate = () => setDateModal({ mode: 'create', initial: {} })
+  const openDateEdit = (d) => setDateModal({ mode: 'edit', initial: d })
+
+  const handleSaveDate = async (payload) => {
+    if (dateModal?.mode === 'edit' && dateModal.initial?.id) {
+      await updateDate(dateModal.initial.id, payload)
+      setToast({ type: 'success', message: 'Date updated' })
+    } else {
+      await addDate(payload)
+      setToast({ type: 'success', message: 'Date added' })
+    }
+  }
+
+  const handleDeleteDate = async () => {
+    if (!dateModal?.initial?.id) return
+    await deleteDate(dateModal.initial.id)
+    setToast({ type: 'success', message: 'Date deleted' })
+  }
+
   const handlePreset = (presetId) => {
     const p = PRESETS.find((x) => x.id === presetId)
     if (!p) return
@@ -288,7 +320,7 @@ export default function App() {
       if (e.key === 'n') { openCreate(null); return }
       if (e.key === 't') { setAnchorDate(new Date()); return }
 
-      if (view === 'list') return
+      if (view === 'list' || view === 'dates') return
       if (e.key === 'ArrowLeft') {
         setAnchorDate((d) => view === 'month' ? subMonths(d, 1) : view === 'week' ? subWeeks(d, 1) : subDays(d, 1))
       }
@@ -329,6 +361,10 @@ export default function App() {
           pendingRequestCount={pendingRequestCount}
           onReviewRequests={() => setRequestsPanelOpen(true)}
           onSubmitRequest={() => setRequestModalOpen(true)}
+          importantDates={importantDates}
+          onDateItemClick={openDateEdit}
+          onAddDate={openDateCreate}
+          onOpenAllDates={() => setView('dates')}
         />
 
         <main className="flex-1 min-w-0 max-w-full">
@@ -343,7 +379,9 @@ export default function App() {
 
             {!loading && !error && (
               <>
-                <SearchBar filters={filters} onChange={setFilters} onClear={clearAll} />
+                {view !== 'dates' && (
+                  <SearchBar filters={filters} onChange={setFilters} onClear={clearAll} />
+                )}
 
                 <Dashboard
                   collapsed={dashboardCollapsed}
@@ -357,13 +395,21 @@ export default function App() {
                   pendingRequestCount={pendingRequestCount}
                   onReviewRequests={() => setRequestsPanelOpen(true)}
                   onSubmitRequest={() => setRequestModalOpen(true)}
+                  importantDates={importantDates}
+                  importantDatesTableMissing={datesTableMissing}
+                  onDateItemClick={openDateEdit}
+                  onAddDate={openDateCreate}
+                  onOpenAllDates={() => setView('dates')}
                 />
 
-                <PresetChips activePreset={activePreset} onApply={handlePreset} />
+                {view !== 'dates' && (
+                  <>
+                    <PresetChips activePreset={activePreset} onApply={handlePreset} />
+                    <Stats items={filtered} totalCount={items.length} filters={filters} />
+                  </>
+                )}
 
-                <Stats items={filtered} totalCount={items.length} filters={filters} />
-
-                {view !== 'list' && (
+                {view !== 'list' && view !== 'dates' && (
                   <TbcPanel
                     items={tbc}
                     onItemClick={openEdit}
@@ -380,6 +426,8 @@ export default function App() {
                     onItemClick={openEdit}
                     onAddItem={openCreate}
                     drag={drag}
+                    importantDates={importantDates}
+                    onDateClick={openDateEdit}
                   />
                 )}
                 {view === 'week' && (
@@ -390,6 +438,8 @@ export default function App() {
                     onItemClick={openEdit}
                     onAddItem={openCreate}
                     drag={drag}
+                    importantDates={importantDates}
+                    onDateClick={openDateEdit}
                   />
                 )}
                 {view === 'day' && (
@@ -399,10 +449,20 @@ export default function App() {
                     items={dated}
                     onItemClick={openEdit}
                     onAddItem={openCreate}
+                    importantDates={importantDates}
+                    onDateClick={openDateEdit}
                   />
                 )}
                 {view === 'list' && (
                   <ListView items={filtered} onItemClick={openEdit} />
+                )}
+                {view === 'dates' && (
+                  <DatesView
+                    dates={importantDates}
+                    tableMissing={datesTableMissing}
+                    onItemClick={openDateEdit}
+                    onAdd={openDateCreate}
+                  />
                 )}
 
                 <KeyboardHint />
@@ -461,6 +521,16 @@ export default function App() {
             openEdit(it)
           }}
           onClose={() => setCampaignOpen(null)}
+        />
+      )}
+
+      {dateModal && (
+        <DateModal
+          mode={dateModal.mode}
+          initial={dateModal.initial}
+          onSave={handleSaveDate}
+          onDelete={dateModal.mode === 'edit' ? handleDeleteDate : undefined}
+          onClose={() => setDateModal(null)}
         />
       )}
 

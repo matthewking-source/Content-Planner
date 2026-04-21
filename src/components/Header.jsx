@@ -1,10 +1,11 @@
-import { IconCalendar, IconWeek, IconDay, IconList, IconDownload, IconPlus, IconMenu } from './Icons.jsx'
+import { IconCalendar, IconWeek, IconDay, IconList, IconDownload, IconPlus, IconMenu, IconSparkle } from './Icons.jsx'
 
 const VIEWS = [
   { key: 'month', label: 'Month', Icon: IconCalendar },
   { key: 'week',  label: 'Week',  Icon: IconWeek },
   { key: 'day',   label: 'Day',   Icon: IconDay },
   { key: 'list',  label: 'List',  Icon: IconList },
+  { key: 'dates', label: 'Dates', Icon: IconSparkle },
 ]
 
 export default function Header({

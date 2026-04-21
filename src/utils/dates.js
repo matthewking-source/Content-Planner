@@ -144,3 +144,50 @@ export function within48h(iso, ref = new Date()) {
   const diff = differenceInHours(d, ref)
   return diff >= 0 && diff <= 48
 }
+
+/**
+ * Does an important-date row (with .date and optional .end_date) cover the given Date?
+ * Uses string compare on ISO YYYY-MM-DD so timezones can't skew.
+ */
+export function importantDateCoversDay(importantDate, day) {
+  if (!importantDate?.date) return false
+  const iso = isoDate(day)
+  const start = importantDate.date
+  const end = importantDate.end_date || start
+  return iso >= start && iso <= end
+}
+
+/**
+ * Sort important dates by start date ascending, end date ascending, then label.
+ */
+export function sortImportantDates(list) {
+  return [...list].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1
+    const ae = a.end_date || a.date
+    const be = b.end_date || b.date
+    if (ae !== be) return ae < be ? -1 : 1
+    return (a.label || '').localeCompare(b.label || '')
+  })
+}
+
+/**
+ * Nice "in 3 days / today / tomorrow / in 2 weeks" relative description
+ * for an upcoming date. Past dates return 'past'.
+ */
+export function relativeUntil(iso, ref = new Date()) {
+  const d = fromIso(iso)
+  if (!d) return ''
+  // Compare using ISO date strings to ignore time-of-day
+  const today = isoDate(ref)
+  const target = isoDate(d)
+  if (target < today) return 'past'
+  if (target === today) return 'today'
+  const diffMs = d.getTime() - new Date(today + 'T00:00').getTime()
+  const days = Math.round(diffMs / (1000 * 60 * 60 * 24))
+  if (days === 1) return 'tomorrow'
+  if (days < 7) return `in ${days} days`
+  if (days < 14) return `in 1 week`
+  if (days < 30) return `in ${Math.floor(days / 7)} weeks`
+  if (days < 60) return `in 1 month`
+  return `in ${Math.floor(days / 30)} months`
+}

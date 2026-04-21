@@ -1,13 +1,18 @@
 import { format, isToday, getDay } from 'date-fns'
 import CalendarItem from './CalendarItem.jsx'
+import DateBanner from './DateBanner.jsx'
 import { IconPlus } from './Icons.jsx'
-import { isoDate, sameMonth } from '../utils/dates.js'
+import { isoDate, sameMonth, importantDateCoversDay } from '../utils/dates.js'
 
-export default function CalendarDay({ day, monthDate, items, onItemClick, onAddItem, drag }) {
+export default function CalendarDay({
+  day, monthDate, items, onItemClick, onAddItem, drag,
+  importantDates = [], onDateClick,
+}) {
   const inMonth = sameMonth(day, monthDate)
   const today = isToday(day)
   const dateStr = isoDate(day)
   const dayItems = items.filter((i) => i.date === dateStr)
+  const datesForDay = importantDates.filter((d) => importantDateCoversDay(d, day))
   const dow = getDay(day)
   const weekend = dow === 0 || dow === 6
 
@@ -49,6 +54,10 @@ export default function CalendarDay({ day, monthDate, items, onItemClick, onAddI
           <IconPlus width={12} height={12} />
         </button>
       </div>
+
+      {datesForDay.length > 0 && (
+        <DateBanner dates={datesForDay} variant="month" onClick={onDateClick} />
+      )}
 
       <div className="day-items flex-1 space-y-1 overflow-y-auto max-h-[180px]">
         {dayItems.map((it) => (

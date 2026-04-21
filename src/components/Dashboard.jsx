@@ -3,6 +3,7 @@ import NeedsAttentionTile from './dashboard/NeedsAttentionTile.jsx'
 import ChannelHeatmap from './dashboard/ChannelHeatmap.jsx'
 import ChannelRow from './dashboard/ChannelRow.jsx'
 import RequestsTile from './dashboard/RequestsTile.jsx'
+import DatesTile from './dashboard/DatesTile.jsx'
 import { IconChevDn, IconChevUp, IconGrid } from './Icons.jsx'
 
 export default function Dashboard({
@@ -17,6 +18,12 @@ export default function Dashboard({
   pendingRequestCount,
   onReviewRequests,
   onSubmitRequest,
+  // Important dates
+  importantDates,
+  importantDatesTableMissing,
+  onDateItemClick,
+  onAddDate,
+  onOpenAllDates,
 }) {
   return (
     <section className="space-y-3 animate-fade">
@@ -66,6 +73,14 @@ export default function Dashboard({
               onCellClick={onHeatmapCellClick}
             />
           </div>
+
+          <DatesTile
+            dates={importantDates || []}
+            tableMissing={importantDatesTableMissing}
+            onItemClick={onDateItemClick}
+            onAdd={onAddDate}
+            onOpenAll={onOpenAllDates}
+          />
 
           <ChannelRow
             allItems={allItems}
